@@ -122,6 +122,7 @@ def main():
     Leave as is.
     """
     print("*" * 50)
+    print("sambosa")
     print_red("To terminate this program use: CTRL+C")
     print_red("If the program blocks/throws, you have to terminate it manually.")
     print_green(f"NODE UUID: {get_node_uuid()}")
