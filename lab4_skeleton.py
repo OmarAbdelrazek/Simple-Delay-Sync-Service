@@ -62,12 +62,15 @@ server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # Leave broadcaster as a global variable.
 broadcaster = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # Setup the UDP socket
+broadcaster.bind(("255.255.255.255", get_broadcast_port())
 
 
 def send_broadcast_thread():
     node_uuid = get_node_uuid()
     while True:
         # TODO: write logic for sending broadcasts.
+        
+
         time.sleep(1)   # Leave as is.
 
 
