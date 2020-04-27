@@ -61,13 +61,30 @@ server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 # Leave broadcaster as a global variable.
 broadcaster = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+broadcaster.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+broadcaster.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
 # Setup the UDP socket
 
 
+def get_tcp_port():
+    temp = str(server).split(',')
+    laddr = temp[-1]
+    port = int(laddr[1:-2])    
+    # print((laddr))
+    return port
+
 def send_broadcast_thread():
     node_uuid = get_node_uuid()
+    tcp_port = get_tcp_port()
     while True:
-        # TODO: write logic for sending broadcasts.
+        print(server)
+    # TODO: write logic for sending broadcasts.
+        data = node_uuid+" ON "+str(tcp_port)
+        print(data)
+        address = ('<broadcast>',get_broadcast_port())
+        broadcaster.sendto(bytes(data,'UTF-8'),address)
+        print("sent")
         time.sleep(1)   # Leave as is.
 
 
@@ -77,10 +94,13 @@ def receive_broadcast_thread():
     launches a thread to connect to new nodes
     and exchange timestamps.
     """
+    broadcaster.bind(("",  get_broadcast_port()))
+
     while True:
         # TODO: write logic for receiving broadcasts.
         data, (ip, port) = broadcaster.recvfrom(4096)
-        print_blue(f"RECV: {data} FROM: {ip}:{port}")
+        # print(data)
+        print_blue(f"RECV: {data.decode()} FROM: {ip}:{port}")
 
 
 def tcp_server_thread():
@@ -111,6 +131,14 @@ def daemon_thread_builder(target, args=()) -> threading.Thread:
 
 
 def entrypoint():
+    th1 = daemon_thread_builder(target = send_broadcast_thread)
+    th2= daemon_thread_builder(target = receive_broadcast_thread)
+    th1.start()
+    th2.start()    
+    th1.join()
+    th2.join() 
+    
+    
     pass
 
 ############################################
@@ -122,7 +150,7 @@ def main():
     Leave as is.
     """
     print("*" * 50)
-    print("sambosak ya fala7")
+    
     print_red("To terminate this program use: CTRL+C")
     print_red("If the program blocks/throws, you have to terminate it manually.")
     print_green(f"NODE UUID: {get_node_uuid()}")
