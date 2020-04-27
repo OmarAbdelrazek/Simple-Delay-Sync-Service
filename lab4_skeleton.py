@@ -58,28 +58,27 @@ class NeighborInfo(object):
 neighbor_information = {}
 # Leave the server socket as global variable.
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+server.listen(10)
+tcp_port = server.getsockname()[1]
+print(server)
 # Leave broadcaster as a global variable.
 broadcaster = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 broadcaster.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 broadcaster.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+broadcaster.bind(('0.0.0.0',get_broadcast_port()))
 
 # Setup the UDP socket
 
 
-def get_tcp_port():
-    temp = str(server).split(',')
-    laddr = temp[-1]
-    port = int(laddr[1:-2])    
-    # print((laddr))
-    return port
 
 def send_broadcast_thread():
     node_uuid = get_node_uuid()
-    tcp_port = get_tcp_port()
+
+    
     while True:
-        print(server)
+        # print(server)
     # TODO: write logic for sending broadcasts.
+        
         data = node_uuid+" ON "+str(tcp_port)
         print(data)
         address = ('<broadcast>',get_broadcast_port())
@@ -94,12 +93,13 @@ def receive_broadcast_thread():
     launches a thread to connect to new nodes
     and exchange timestamps.
     """
-    broadcaster.bind(("",  get_broadcast_port()))
-
+    
     while True:
         # TODO: write logic for receiving broadcasts.
         data, (ip, port) = broadcaster.recvfrom(4096)
-        # print(data)
+        parsed_data = data.decode().split(" ")
+        port = int(parsed_data[2])
+
         print_blue(f"RECV: {data.decode()} FROM: {ip}:{port}")
 
 
