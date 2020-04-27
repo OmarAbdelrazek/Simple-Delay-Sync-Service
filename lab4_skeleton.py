@@ -5,6 +5,8 @@ import socket
 import time
 import uuid
 import struct
+from datetime import timezone 
+import datetime 
 # https://bluesock.org/~willkg/dev/ansi.html
 ANSI_RESET = "\u001B[0m"
 ANSI_RED = "\u001B[31m"
@@ -39,6 +41,11 @@ def get_node_uuid():
     return _NODE_UUID
 
 
+def UtcNow():
+    now = datetime.datetime.utcnow()
+    return (now - datetime.datetime(1970, 1, 1)).total_seconds()
+
+
 class NeighborInfo(object):
     def __init__(self, delay, last_timestamp, ip=None, tcp_port=None):
         # Ip and port are optional, if you want to store them.
@@ -58,9 +65,11 @@ class NeighborInfo(object):
 neighbor_information = {}
 # Leave the server socket as global variable.
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.listen(10)
+server.listen(20)
 tcp_port = server.getsockname()[1]
-print(server)
+
+
+
 # Leave broadcaster as a global variable.
 broadcaster = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 broadcaster.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
@@ -99,8 +108,17 @@ def receive_broadcast_thread():
         data, (ip, port) = broadcaster.recvfrom(4096)
         parsed_data = data.decode().split(" ")
         port = int(parsed_data[2])
-
+        recieved_uuid = parsed_data[0]
+        recieved_tcp_port = parsed_data[2]
         print_blue(f"RECV: {data.decode()} FROM: {ip}:{port}")
+
+        th3 = daemon_thread_builder(target =exchange_timestamps_thread,args=(recieved_uuid,ip,recieved_tcp_port))
+        th4= daemon_thread_builder(target = tcp_server_thread)
+        th3.start()
+        th4.start()
+        th3.join()
+        th4.join()
+        
 
 
 def tcp_server_thread():
@@ -108,6 +126,9 @@ def tcp_server_thread():
     Accept connections from other nodes and send them
     this node's timestamp once they connect.
     """
+    node_socket,(node_ip,port_ip) = server.accept()
+    timestamp = node_socket.recvfrom(4096)[0].decode()
+    print(timestamp)
     pass
 
 
@@ -117,7 +138,12 @@ def exchange_timestamps_thread(other_uuid: str, other_ip: str, other_tcp_port: i
     and do the steps to exchange timestamps.
     Then update the neighbor_info map using other node's UUID.
     """
+    other_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    other_socket.connect((other_ip,int(other_tcp_port)))
+    timestamp = UtcNow()
+    other_socket.send(bytes(str(timestamp),'utf-8'))
     print_yellow(f"ATTEMPTING TO CONNECT TO {other_uuid}")
+    
     pass
 
 
@@ -133,10 +159,15 @@ def daemon_thread_builder(target, args=()) -> threading.Thread:
 def entrypoint():
     th1 = daemon_thread_builder(target = send_broadcast_thread)
     th2= daemon_thread_builder(target = receive_broadcast_thread)
+
+    
+    
     th1.start()
-    th2.start()    
+    th2.start()   
+    
     th1.join()
     th2.join() 
+
     
     
     pass
