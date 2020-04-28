@@ -85,17 +85,18 @@ broadcaster.bind(('0.0.0.0',get_broadcast_port()))
 
 def send_broadcast_thread():
     node_uuid = get_node_uuid()
-    
+    broadcast_count = -1
     while True:
-        
+
+
         # print(server)
     # TODO: write logic for sending broadcasts.
-    
+
         data = node_uuid+" ON "+str(tcp_port)
-        
         address = ('<broadcast>',get_broadcast_port())
         broadcaster.sendto(bytes(data,'UTF-8'),address)
         
+
         time.sleep(1)   # Leave as is.
 
 
@@ -105,11 +106,13 @@ def receive_broadcast_thread():
     launches a thread to connect to new nodes
     and exchange timestamps.
     """
-    
+    # global devices_counter
+    # devices_counter += 1
+    # neighbor_numbers[recieved_uuid] = devices_counter
     while True:
-        
+
         # TODO: write logic for receiving broadcasts.
-        
+
         data, (ip, port) = broadcaster.recvfrom(4096)
         parsed_data = data.decode().split(" ")
         if len(parsed_data) == 3:
@@ -121,19 +124,21 @@ def receive_broadcast_thread():
                     print(neighbor_numbers)
                     print_yellow(("[UDP] Device "+str(devices_counter)+" -> EVERYBODY : "+data.decode()))
                     # print_yellow(f"RECV: {data.decode()} FROM: {ip}:{port}")
+                    if neighbor_information.get(recieved_uuid) == None:
+                        neighbor_information[recieved_uuid] = (0,0)
                     th3 = daemon_thread_builder(target =exchange_timestamps_thread,args=(recieved_uuid,ip,recieved_tcp_port))    
                     th3.start()
                     th3.join()
         else:
             print_red("Wrong Protocol Format")
+
+
 def tcp_server_thread():
     """
     Accept connections from other nodes and send them
     this node's timestamp once they connect.
     """
-    # global devices_counter
-    # devices_counter += 1
-    # neighbor_numbers[recieved_uuid] = devices_counter
+    
     while True:
         node_socket,(node_ip,port_ip) = server.accept()
         timestamp = float(node_socket.recvfrom(4096)[0].decode())
@@ -159,8 +164,15 @@ def exchange_timestamps_thread(other_uuid: str, other_ip: str, other_tcp_port: i
     new_timestamp = float(other_socket.recvfrom(4096)[0].decode())
     delay = new_timestamp - timestamp
     new_node = NeighborInfo(delay,new_timestamp,other_ip,other_tcp_port)
-    neighbor_information[other_uuid] = delay
-    print(neighbor_information)
+
+
+
+    count = neighbor_information.get(other_uuid)[1]
+    if(count == 9):
+        neighbor_information[other_uuid] = (0,0)
+    else:
+        neighbor_information[other_uuid] = (delay,neighbor_information.get(other_uuid)[1]+1)
+    print("hena: ",neighbor_information)
     pass
 
 
@@ -172,10 +184,12 @@ def daemon_thread_builder(target, args=()) -> threading.Thread:
     th.setDaemon(True)
     return th
 
+def show_nei():
+    for i in neighbor_numbers:
+        print(i)
 
 def entrypoint():
-    
-
+    show_nei()
     th1 = daemon_thread_builder(target = send_broadcast_thread)
     th2= daemon_thread_builder(target = receive_broadcast_thread)
     th4= daemon_thread_builder(target = tcp_server_thread)
@@ -183,9 +197,8 @@ def entrypoint():
     th2.start()
     th4.start()
     th1.join()
-    th2.join() 
+    th2.join()
     th4.join()
-    
     pass
 
 def main():
