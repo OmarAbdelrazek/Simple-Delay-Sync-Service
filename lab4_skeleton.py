@@ -97,11 +97,10 @@ def send_broadcast_thread():
         data = node_uuid+" ON "+str(tcp_port)
         address = ('<broadcast>',get_broadcast_port())
         broadcaster.sendto(bytes(data,'UTF-8'),address)
-
         time.sleep(1)   # Leave as is.
 
 
-  
+
 
 def receive_broadcast_thread():
     """
@@ -127,7 +126,8 @@ def receive_broadcast_thread():
                 
                 if recieved_uuid != get_node_uuid():
                     if neighbor_information.get(recieved_uuid) == None:
-                        neighbor_information[recieved_uuid] = (0,0)
+                        empty_neighborInfo = NeighborInfo(0,0,None,None)
+                        neighbor_information[recieved_uuid] = (empty_neighborInfo,0)
                         neighbor_numbers[recieved_uuid] = devices_counter
                         devices_counter += 1
                     first_delay = True
@@ -179,7 +179,7 @@ def exchange_timestamps_thread(other_uuid: str, other_ip: str, other_tcp_port: i
     delay = new_timestamp - timestamp
     
 
-    
+
 
     count = neighbor_information.get(other_uuid)[1]
     if(count == 10):
@@ -188,18 +188,15 @@ def exchange_timestamps_thread(other_uuid: str, other_ip: str, other_tcp_port: i
         new_node = neighbor_information.get(other_uuid)[0]
         new_node.delay = delay
         new_node.last_timestamp = new_timestamp #sambosak
-        print("IF: ",new_node,1)
         neighbor_information[other_uuid] = (new_node,1)
         
     else:
         if first_delay == True:
             print_blue(("[TCP] Device "+str(neighbor_numbers.get(other_uuid))+" connects to port "+str(other_tcp_port)+"of device"+str(neighbor_numbers.get(get_node_uuid()))))
             new_node = NeighborInfo(delay,new_timestamp,other_ip,other_tcp_port)
-            print("ELSE IF: ",new_node,neighbor_information.get(other_uuid)[1]+1)
             neighbor_information[other_uuid] = (new_node,neighbor_information.get(other_uuid)[1]+1)
             first_delay = False
         else:
-            print("ELSE: ",neighbor_information.get(other_uuid)[0],neighbor_information.get(other_uuid)[1]+1)
             neighbor_information[other_uuid] = (neighbor_information.get(other_uuid)[0],neighbor_information.get(other_uuid)[1]+1)
     # print(neighbor_information.get(other_uuid)[0].delay,       neighbor_information.get(other_uuid)[1])
     print_green(("[TCP] Device "+str(neighbor_numbers.get(other_uuid))+" -> Device "+str(neighbor_numbers.get(get_node_uuid()))+"  : [ "+str(other_uuid)+"'s "+str(timestamp)+" ]"))
@@ -220,6 +217,7 @@ def entrypoint():
     th1 = daemon_thread_builder(target = send_broadcast_thread)
     th2= daemon_thread_builder(target = receive_broadcast_thread)
     th4= daemon_thread_builder(target = tcp_server_thread)
+
     th1.start()
     th2.start()
     th4.start()
