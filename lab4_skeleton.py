@@ -56,10 +56,12 @@ class NeighborInfo(object):
         self.tcp_port = tcp_port
 
 
+
 ############################################
 #######  Y  O  U  R     C  O  D  E  ########
 ############################################
 devices_counter = 0
+first_delay = True
 
 # Don't change any variable's name.
 # Use this hashmap to store the information of your neighbor nodes.
@@ -95,10 +97,11 @@ def send_broadcast_thread():
         data = node_uuid+" ON "+str(tcp_port)
         address = ('<broadcast>',get_broadcast_port())
         broadcaster.sendto(bytes(data,'UTF-8'),address)
-        
 
         time.sleep(1)   # Leave as is.
 
+
+  
 
 def receive_broadcast_thread():
     """
@@ -106,7 +109,7 @@ def receive_broadcast_thread():
     launches a thread to connect to new nodes
     and exchange timestamps.
     """
-    # global devices_counter
+    global devices_counter
     # devices_counter += 1
     # neighbor_numbers[recieved_uuid] = devices_counter
     while True:
@@ -114,23 +117,32 @@ def receive_broadcast_thread():
         # TODO: write logic for receiving broadcasts.
 
         data, (ip, port) = broadcaster.recvfrom(4096)
+        
         parsed_data = data.decode().split(" ")
         if len(parsed_data) == 3:
             if parsed_data[1] == "ON" and len(parsed_data[0]) == 8:
                 port = int(parsed_data[2])
                 recieved_uuid = parsed_data[0]
                 recieved_tcp_port = parsed_data[2]
+                
                 if recieved_uuid != get_node_uuid():
-                    print(neighbor_numbers)
-                    print_yellow(("[UDP] Device "+str(devices_counter)+" -> EVERYBODY : "+data.decode()))
-                    # print_yellow(f"RECV: {data.decode()} FROM: {ip}:{port}")
                     if neighbor_information.get(recieved_uuid) == None:
                         neighbor_information[recieved_uuid] = (0,0)
+                        neighbor_numbers[recieved_uuid] = devices_counter
+                        devices_counter += 1
+                    first_delay = True
+                    # print(neighbor_numbers)
+                    # print_yellow(("[UDP] Device "+str(devices_counter)+" -> EVERYBODY : "+data.decode()))
+                    # print_yellow(f"RECV: {data.decode()} FROM: {ip}:{port}")
+                    
                     th3 = daemon_thread_builder(target =exchange_timestamps_thread,args=(recieved_uuid,ip,recieved_tcp_port))    
                     th3.start()
                     th3.join()
         else:
             print_red("Wrong Protocol Format")
+
+
+
 
 
 def tcp_server_thread():
@@ -153,26 +165,44 @@ def exchange_timestamps_thread(other_uuid: str, other_ip: str, other_tcp_port: i
     and do the steps to exchange timestamps.
     Then update the neighbor_info map using other node's UUID.
     """
+    global first_delay
+    # if neighbor_information.get(other_uuid) == None:
+    
     other_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    other_socket.connect((other_ip,int(other_tcp_port)))
+    other_socket.connect((other_ip,int(other_tcp_port)))    
     timestamp = UtcNow()
-    print_blue(("[TCP] Device "+str(neighbor_numbers.get(other_uuid))+" connects to port "+str(other_tcp_port)+"of device"+str(neighbor_numbers.get(get_node_uuid()))))
     other_socket.send(bytes(str(timestamp),'utf-8'))
-    print_green(("[TCP] Device "+str(neighbor_numbers.get(other_uuid))+" -> Device "+str(neighbor_numbers.get(get_node_uuid()))+"  : [ "+str(other_uuid)+"'s "+str(timestamp)+" ]"))
+    
     # print_yellow(f"ATTEMPTING TO CONNECT TO {other_uuid}")
     
     new_timestamp = float(other_socket.recvfrom(4096)[0].decode())
     delay = new_timestamp - timestamp
-    new_node = NeighborInfo(delay,new_timestamp,other_ip,other_tcp_port)
+    
 
-
+    
 
     count = neighbor_information.get(other_uuid)[1]
-    if(count == 9):
-        neighbor_information[other_uuid] = (0,0)
+    if(count == 10):
+        # new_node = NeighborInfo(None,None)
+        print(neighbor_information.get(other_uuid)[0].delay)
+        new_node = neighbor_information.get(other_uuid)[0]
+        new_node.delay = delay
+        new_node.last_timestamp = new_timestamp #sambosak
+        print("IF: ",new_node,1)
+        neighbor_information[other_uuid] = (new_node,1)
+        
     else:
-        neighbor_information[other_uuid] = (delay,neighbor_information.get(other_uuid)[1]+1)
-    print("hena: ",neighbor_information)
+        if first_delay == True:
+            print_blue(("[TCP] Device "+str(neighbor_numbers.get(other_uuid))+" connects to port "+str(other_tcp_port)+"of device"+str(neighbor_numbers.get(get_node_uuid()))))
+            new_node = NeighborInfo(delay,new_timestamp,other_ip,other_tcp_port)
+            print("ELSE IF: ",new_node,neighbor_information.get(other_uuid)[1]+1)
+            neighbor_information[other_uuid] = (new_node,neighbor_information.get(other_uuid)[1]+1)
+            first_delay = False
+        else:
+            print("ELSE: ",neighbor_information.get(other_uuid)[0],neighbor_information.get(other_uuid)[1]+1)
+            neighbor_information[other_uuid] = (neighbor_information.get(other_uuid)[0],neighbor_information.get(other_uuid)[1]+1)
+    # print(neighbor_information.get(other_uuid)[0].delay,       neighbor_information.get(other_uuid)[1])
+    print_green(("[TCP] Device "+str(neighbor_numbers.get(other_uuid))+" -> Device "+str(neighbor_numbers.get(get_node_uuid()))+"  : [ "+str(other_uuid)+"'s "+str(timestamp)+" ]"))
     pass
 
 
@@ -184,12 +214,9 @@ def daemon_thread_builder(target, args=()) -> threading.Thread:
     th.setDaemon(True)
     return th
 
-def show_nei():
-    for i in neighbor_numbers:
-        print(i)
 
 def entrypoint():
-    show_nei()
+    
     th1 = daemon_thread_builder(target = send_broadcast_thread)
     th2= daemon_thread_builder(target = receive_broadcast_thread)
     th4= daemon_thread_builder(target = tcp_server_thread)
