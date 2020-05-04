@@ -16,33 +16,23 @@ ANSI_BLUE = "\u001B[34m"
 
 _NODE_UUID = str(uuid.uuid4())[:8]
 
-
 def print_yellow(msg):
     print(f"{ANSI_YELLOW}{msg}{ANSI_RESET}")
-
 
 def print_blue(msg):
     print(f"{ANSI_BLUE}{msg}{ANSI_RESET}")
 
-
 def print_red(msg):
     print(f"{ANSI_RED}{msg}{ANSI_RESET}")
-
 
 def print_green(msg):
     print(f"{ANSI_GREEN}{msg}{ANSI_RESET}")
 
-
 def get_broadcast_port():
     return 35498
 
-
 def get_node_uuid():
     return _NODE_UUID
-
-
-
-
 
 class NeighborInfo(object):
     def __init__(self, delay, last_timestamp, ip=None, tcp_port=None):
@@ -51,7 +41,6 @@ class NeighborInfo(object):
         self.last_timestamp = last_timestamp
         self.ip = ip
         self.tcp_port = tcp_port
-
 
 ############################################
 #######  Y  O  U  R     C  O  D  E  ########
@@ -65,6 +54,7 @@ neighbor_numbers = {}
 devices_counter = 0
 first_connect = True
 first_delay = True
+
 # Leave the server socket as global variable.
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.listen(20)
@@ -90,7 +80,6 @@ def send_broadcast_thread():
         broadcaster.sendto(bytes(data,'UTF-8'),address)
         time.sleep(1)   # Leave as is.
 
-
 def receive_broadcast_thread():
     """
     Receive broadcasts from other nodes,
@@ -100,7 +89,6 @@ def receive_broadcast_thread():
     global devices_counter,neighbor_numbers
     while True:
         # TODO: write logic for receiving broadcasts.
-        
         data, (ip, port) = broadcaster.recvfrom(4096)
         parsed_data = data.decode().split(" ")
         if (len(parsed_data) == 3 and parsed_data[1] == "ON" and len(parsed_data[0]) == 8):
@@ -111,20 +99,14 @@ def receive_broadcast_thread():
                 neighbor_numbers[get_node_uuid()] = devices_counter
                 devices_counter += 1
                 continue
-
             if recieved_uuid != get_node_uuid():
                 if neighbor_numbers.get(recieved_uuid) == None:
                     neighbor_numbers[recieved_uuid] = devices_counter
                     devices_counter += 1
-                    
                     continue
-                
                 th4 = daemon_thread_builder(target =exchange_timestamps_thread,args=(recieved_uuid,ip,recieved_tcp_port))    
                 th4.start()
                 th4.join()
-
-
-
 
 def tcp_server_thread():
     """
@@ -135,11 +117,8 @@ def tcp_server_thread():
         node_socket,(node_ip,port_ip) = server.accept()
         timestamp = float(node_socket.recvfrom(4096)[0].decode())
         new_timestamp = UtcNow()
-        
         node_socket.send(bytes(str(new_timestamp),'utf-8'))
-        
     pass
-
 
 def exchange_timestamps_thread(other_uuid: str, other_ip: str, other_tcp_port: int):
     """
@@ -149,31 +128,21 @@ def exchange_timestamps_thread(other_uuid: str, other_ip: str, other_tcp_port: i
     """
     global first_connect,first_delay,neighbor_information,neighbor_numbers
     other_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    
     other_socket.connect((other_ip,int(other_tcp_port)))
-        
     timestamp = UtcNow()
     other_socket.send(bytes(str(timestamp),'utf-8'))
-    
-    
     new_timestamp = float(other_socket.recvfrom(4096)[0].decode())
-    
-
     delay = new_timestamp - timestamp
-
     if first_connect:
         print_yellow(f"ATTEMPTING TO CONNECT TO {other_uuid}")
         print_yellow("[TCP] Device "+str(neighbor_numbers.get(get_node_uuid()))+" connects to port "+str(other_tcp_port)+" of device "+str(neighbor_numbers.get(other_uuid)))
         first_connect = False
-    
-    
     if first_delay :
         new_node = NeighborInfo(delay,new_timestamp,other_ip,other_tcp_port)
         neighbor_information[other_uuid] = (new_node,1)
         neighbor_information[get_node_uuid()] = (NeighborInfo(delay,new_timestamp),1)
         first_delay = False
         print_blue(other_uuid+"'s timestamp "+str(neighbor_information.get(other_uuid)[0].delay)+" ")
-
     else:
         try:
             count = neighbor_information.get(other_uuid)[1]
@@ -190,12 +159,9 @@ def exchange_timestamps_thread(other_uuid: str, other_ip: str, other_tcp_port: i
             node.last_timestamp = new_timestamp
             neighbor_information[other_uuid] = (node,1)
             print_blue(other_uuid+str(neighbor_information.get(other_uuid)[0].delay)+str( neighbor_information.get(other_uuid)[1]))
-
     print_green("[TCP] Device "+str(neighbor_numbers.get(other_uuid))+" -> Device "+str(neighbor_numbers.get(get_node_uuid()))+"  : [ "+str(other_uuid)+"'s "+str(new_timestamp)+" ]")
     print_green("[TCP] Device "+str(neighbor_numbers.get(get_node_uuid()))+" -> Device "+str(neighbor_numbers.get(other_uuid))+"  : [ "+str(get_node_uuid())+"'s "+str(timestamp)+" ]")
-
     pass
-
 
 def daemon_thread_builder(target, args=()) -> threading.Thread:
     """
@@ -204,7 +170,6 @@ def daemon_thread_builder(target, args=()) -> threading.Thread:
     th = threading.Thread(target=target, args=args)
     th.setDaemon(True)
     return th
-
 
 def entrypoint():
     th1 = daemon_thread_builder(target = send_broadcast_thread)
@@ -219,8 +184,6 @@ def entrypoint():
     th3.join()
     pass
 
-
-
 def main():
     """
     Leave as is.
@@ -232,7 +195,6 @@ def main():
     print("*" * 50)
     time.sleep(2)   # Wait a little bit.
     entrypoint()
-
 
 if __name__ == "__main__":
     main()
